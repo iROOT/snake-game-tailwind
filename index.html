@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Apply the arcade font */
+        body {
+            font-family: 'Press Start 2P', cursive;
+            /* Prevent text selection */
+            user-select: none;
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE10+/Edge */
+        }
+        /* Style for the game canvas */
+        canvas {
+            border: 4px solid #333; /* Dark border for the canvas */
+            background-color: #a3d9a5; /* Light green background */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+            border-radius: 8px; /* Rounded corners */
+            display: block; /* Prevent extra space below canvas */
+            margin: 0 auto; /* Center canvas */
+            max-width: 100%; /* Ensure canvas fits smaller screens */
+            height: auto; /* Maintain aspect ratio */
+        }
+        /* Styling for game buttons */
+        .game-button {
+            font-family: 'Press Start 2P', cursive; /* Ensure button text uses the font */
+            padding: 0.75rem 1.5rem; /* y-3, x-6 */
+            border-radius: 0.5rem; /* rounded-lg */
+            border: 2px solid #333; /* Dark border */
+            background-color: #fde047; /* yellow-300 */
+            color: #333; /* Dark text */
+            text-transform: uppercase;
+            font-size: 0.875rem; /* text-sm */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 0 #ca8a04; /* yellow-600 - bottom shadow for 3D effect */
+            margin: 0.5rem; /* m-2 */
+        }
+        .game-button:hover {
+            background-color: #facc15; /* yellow-400 */
+            transform: translateY(-2px); /* Slight lift on hover */
+            box-shadow: 0 6px 0 #ca8a04; /* yellow-600 */
+        }
+        .game-button:active {
+            transform: translateY(2px); /* Push down on click */
+            box-shadow: 0 2px 0 #ca8a04; /* yellow-600 */
+        }
+        .game-button:disabled {
+            background-color: #9ca3af; /* gray-400 */
+            color: #e5e7eb; /* gray-200 */
+            cursor: not-allowed;
+            box-shadow: 0 4px 0 #4b5563; /* gray-600 */
+            transform: translateY(0);
+        }
+        /* Styling for directional buttons */
+        .direction-button {
+            font-family: 'Press Start 2P', cursive;
+            width: 4rem; /* w-16 */
+            height: 4rem; /* h-16 */
+            border-radius: 9999px; /* rounded-full */
+            border: 2px solid #333;
+            background-color: #60a5fa; /* blue-400 */
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem; /* text-2xl */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 0 #2563eb; /* blue-600 */
+            margin: 0.25rem; /* m-1 */
+        }
+        .direction-button:hover {
+            background-color: #3b82f6; /* blue-500 */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #2563eb; /* blue-600 */
+        }
+        .direction-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #2563eb; /* blue-600 */
+        }
+        /* Simple message box */
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            font-size: 1.25rem;
+            z-index: 10;
+            display: none; /* Hidden by default */
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-blue-200 to-blue-400 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <h1 class="text-4xl text-gray-800 mb-4 text-center">Snake Game</h1>
+
+    <div id="score" class="text-2xl text-gray-700 mb-4">Score: 0</div>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div id="messageBox">
+        Game Over!
+        <div id="finalScore" class="mt-2"></div>
+    </div>
+
+    <div class="mt-6 flex flex-wrap justify-center items-center">
+        <button id="startButton" class="game-button">Start Game</button>
+        <button id="restartButton" class="game-button" disabled>Restart Game</button>
+    </div>
+
+    <div class="mt-6 flex flex-col items-center">
+        <button class="direction-button" id="upButton">↑</button>
+        <div class="flex justify-center">
+            <button class="direction-button" id="leftButton">←</button>
+            <button class="direction-button" id="downButton">↓</button>
+            <button class="direction-button" id="rightButton">→</button>
+        </div>
+    </div>
+
+    <script>
+        // Get canvas and context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Get UI elements
+        const scoreElement = document.getElementById('score');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const upButton = document.getElementById('upButton');
+        const downButton = document.getElementById('downButton');
+        const leftButton = document.getElementById('leftButton');
+        const rightButton = document.getElementById('rightButton');
+        const messageBox = document.getElementById('messageBox');
+        const finalScoreElement = document.getElementById('finalScore');
+
+
+        // Game constants
+        const gridSize = 20; // Size of each grid cell (and snake segment/food)
+        const canvasSize = 400; // Must match canvas width/height
+        const tileCount = canvasSize / gridSize; // Number of tiles in each direction
+
+        // Game state variables
+        let snake, food, dx, dy, score, gameLoopInterval, changingDirection, gameRunning, gameOver;
+
+        // Initialize game state (called by start/restart)
+        function initializeGame() {
+            // Initial snake position (center of the canvas)
+            snake = [
+                { x: Math.floor(tileCount / 2) * gridSize, y: Math.floor(tileCount / 2) * gridSize },
+                { x: (Math.floor(tileCount / 2) - 1) * gridSize, y: Math.floor(tileCount / 2) * gridSize },
+                { x: (Math.floor(tileCount / 2) - 2) * gridSize, y: Math.floor(tileCount / 2) * gridSize }
+            ];
+            // Initial movement direction (right)
+            dx = gridSize;
+            dy = 0;
+            // Initial score
+            score = 0;
+            scoreElement.textContent = `Score: ${score}`;
+            // Flags
+            changingDirection = false; // Prevents rapid direction changes causing self-collision
+            gameRunning = false;
+            gameOver = false;
+            // Place initial food
+            createFood();
+            // Clear any previous game loop
+            if (gameLoopInterval) {
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = null;
+            }
+            // Hide game over message
+            messageBox.style.display = 'none';
+            // Reset button states
+            startButton.disabled = false;
+            restartButton.disabled = true;
+            // Clear the canvas initially
+            clearCanvas();
+            drawSnake();
+            drawFood();
+        }
+
+        // --- Drawing Functions ---
+
+        // Clear the canvas
+        function clearCanvas() {
+            ctx.fillStyle = '#a3d9a5'; // Match canvas background color
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+        }
+
+        // Draw a single snake segment
+        function drawSnakePart(snakePart) {
+            ctx.fillStyle = '#16a34a'; // green-600
+            ctx.strokeStyle = '#14532d'; // green-900 (darker border)
+            ctx.lineWidth = 2;
+            ctx.fillRect(snakePart.x, snakePart.y, gridSize, gridSize);
+            ctx.strokeRect(snakePart.x, snakePart.y, gridSize, gridSize);
+        }
+
+        // Draw the entire snake
+        function drawSnake() {
+            snake.forEach(drawSnakePart);
+        }
+
+        // Draw the food
+        function drawFood() {
+            ctx.fillStyle = '#ef4444'; // red-500
+            ctx.strokeStyle = '#b91c1c'; // red-700 (darker border)
+            ctx.lineWidth = 2;
+            ctx.fillRect(food.x, food.y, gridSize, gridSize);
+            ctx.strokeRect(food.x, food.y, gridSize, gridSize);
+        }
+
+        // --- Game Logic Functions ---
+
+        // Generate random coordinates for food, ensuring it's not on the snake
+        function randomFoodCoord(min, max) {
+            return Math.round((Math.random() * (max - min) + min) / gridSize) * gridSize;
+        }
+
+        function createFood() {
+            food = {
+                x: randomFoodCoord(0, canvasSize - gridSize),
+                y: randomFoodCoord(0, canvasSize - gridSize)
+            };
+            // If food spawns on the snake, generate new coordinates
+            snake.forEach(part => {
+                if (part.x === food.x && part.y === food.y) {
+                    createFood();
+                }
+            });
+        }
+
+        // Move the snake by adding a new head and removing the tail
+        function moveSnake() {
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+            snake.unshift(head); // Add new head to the beginning
+
+            // Check if snake ate food
+            const didEatFood = snake[0].x === food.x && snake[0].y === food.y;
+            if (didEatFood) {
+                score += 10;
+                scoreElement.textContent = `Score: ${score}`;
+                createFood(); // Create new food
+            } else {
+                snake.pop(); // Remove tail segment if no food was eaten
+            }
+        }
+
+        // Change snake direction based on input
+        function changeDirection(event) {
+            if (changingDirection || gameOver || !gameRunning) return; // Prevent changing direction too quickly or when game isn't active
+            changingDirection = true; // Lock direction change until next game tick
+
+            const keyPressed = event.key; // For keyboard
+            const buttonId = event.target ? event.target.id : null; // For button clicks
+
+            const goingUp = dy === -gridSize;
+            const goingDown = dy === gridSize;
+            const goingLeft = dx === -gridSize;
+            const goingRight = dx === gridSize;
+
+            // Determine new direction based on key or button ID
+            // Prevent moving directly opposite current direction
+            if ((keyPressed === 'ArrowUp' || buttonId === 'upButton') && !goingDown) {
+                dx = 0;
+                dy = -gridSize;
+            } else if ((keyPressed === 'ArrowDown' || buttonId === 'downButton') && !goingUp) {
+                dx = 0;
+                dy = gridSize;
+            } else if ((keyPressed === 'ArrowLeft' || buttonId === 'leftButton') && !goingRight) {
+                dx = -gridSize;
+                dy = 0;
+            } else if ((keyPressed === 'ArrowRight' || buttonId === 'rightButton') && !goingLeft) {
+                dx = gridSize;
+                dy = 0;
+            }
+        }
+
+        // Check for game over conditions (wall collision or self-collision)
+        function checkGameOver() {
+            // Check wall collision
+            const hitLeftWall = snake[0].x < 0;
+            const hitRightWall = snake[0].x >= canvasSize;
+            const hitTopWall = snake[0].y < 0;
+            const hitBottomWall = snake[0].y >= canvasSize;
+
+            if (hitLeftWall || hitRightWall || hitTopWall || hitBottomWall) {
+                return true;
+            }
+
+            // Check self-collision (check if head collides with any part of the body)
+            for (let i = 4; i < snake.length; i++) {
+                if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // --- Main Game Loop ---
+        function gameLoop() {
+            if (gameOver) {
+                // Display Game Over message
+                finalScoreElement.textContent = `Final Score: ${score}`;
+                messageBox.style.display = 'block';
+                // Update button states
+                startButton.disabled = true; // Keep start disabled
+                restartButton.disabled = false; // Enable restart
+                // Clear the interval
+                clearInterval(gameLoopInterval);
+                gameLoopInterval = null;
+                return;
+            }
+
+            changingDirection = false; // Allow direction change for the next tick
+            clearCanvas();
+            drawFood();
+            moveSnake();
+            drawSnake();
+
+            // Check for game over *after* moving
+            gameOver = checkGameOver();
+        }
+
+        // --- Event Listeners ---
+
+        // Keyboard input
+        document.addEventListener('keydown', changeDirection);
+
+        // Button controls
+        startButton.addEventListener('click', () => {
+            if (!gameRunning && !gameOver) {
+                gameRunning = true;
+                startButton.disabled = true;
+                restartButton.disabled = false; // Can restart once started
+                // Start the game loop interval
+                gameLoopInterval = setInterval(gameLoop, 150); // Adjust speed here (lower number = faster)
+            }
+        });
+
+        restartButton.addEventListener('click', () => {
+            initializeGame(); // Reset everything
+            // Don't start the loop automatically, wait for Start button
+        });
+
+        // Directional button clicks
+        upButton.addEventListener('click', changeDirection);
+        downButton.addEventListener('click', changeDirection);
+        leftButton.addEventListener('click', changeDirection);
+        rightButton.addEventListener('click', changeDirection);
+
+        // --- Initial Setup ---
+        initializeGame(); // Set up the initial game state when the page loads
+
+    </script>
+
+</body>
+</html>
